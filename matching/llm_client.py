@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 from django.conf import settings
 
-load_dotenv()
+load_dotenv(settings.BASE_DIR / '.env', override=False)
 
 _TIMEOUT_SECONDS = 30
 _ATTEMPTS = 2
@@ -96,6 +96,8 @@ def embed(texts: list[str]) -> list[list[float]]:
 
 def _required_text(name: str) -> str:
     value = getattr(settings, name, '')
+    if not (isinstance(value, str) and value.strip()):
+        value = os.environ.get(name, '')
     if isinstance(value, str) and value.strip():
         return value.strip()
     raise ValueError(

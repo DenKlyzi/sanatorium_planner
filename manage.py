@@ -2,10 +2,19 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+def _load_env():
+    base_dir = Path(__file__).resolve().parent
+    load_dotenv(base_dir / '.env', override=False)
 
 
 def main():
     """Run administrative tasks."""
+    _load_env()
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sanatorium_planner.settings')
     try:
         from django.core.management import execute_from_command_line
