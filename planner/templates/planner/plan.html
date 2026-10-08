@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}План{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-3">План</h1>
+<p>Пользователь: {{ plan.user.get_username }}</p>
+<h2 class="h5">Площадки</h2>
+<ul>
+  {% for site in sites %}
+  <li>{{ site.institution.name }}</li>
+  {% endfor %}
+</ul>
+<h2 class="h5">Маршрут</h2>
+<div>{{ plan.route_text|linebreaksbr }}</div>
+<p class="mt-4"><a href="{% url 'search' %}">Новый запрос</a></p>
+{% endblock %}

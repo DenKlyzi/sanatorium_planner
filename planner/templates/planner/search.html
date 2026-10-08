@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Подбор санатория{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4">Подбор санатория</h1>
+{% if match_error %}
+<div class="alert alert-danger">{{ match_error }}</div>
+{% endif %}
+{% include "planner/_search_form.html" %}
+{% endblock %}

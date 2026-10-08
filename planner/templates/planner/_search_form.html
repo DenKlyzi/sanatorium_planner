@@ -1,0 +1,19 @@
+<form method="post" action="{% url 'search' %}">
+  {% csrf_token %}
+  {% for error in form.non_field_errors %}
+  <div class="alert alert-danger">{{ error }}</div>
+  {% endfor %}
+  {% for field in form %}
+  <div class="mb-3">
+    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+    {% if field.help_text %}
+    <div class="form-text">{{ field.help_text }}</div>
+    {% endif %}
+    {% for error in field.errors %}
+    <div class="form-text text-danger">{{ error }}</div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  <button type="submit" class="btn btn-primary">Подобрать</button>
+</form>

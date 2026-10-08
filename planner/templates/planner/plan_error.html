@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}План не собран{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-3">План не собран</h1>
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+{% if form %}
+{% for field in form %}
+{% for item in field.errors %}
+<div class="alert alert-danger">{{ field.label }}: {{ item }}</div>
+{% endfor %}
+{% endfor %}
+{% for item in form.non_field_errors %}
+<div class="alert alert-danger">{{ item }}</div>
+{% endfor %}
+{% endif %}
+<p class="mt-4"><a href="{% url 'search' %}">К запросу</a></p>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Результаты подбора{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4">Результаты подбора</h1>
+
+{# TODO(team): блок карты Leaflet. Вёрстку и карту делаем сами. Платные картографические ключи не подключаем. #}
+<div id="leaflet-map"></div>
+
+{% if explain_error %}
+<div class="alert alert-warning mt-3">{{ explain_error }}</div>
+{% endif %}
+
+{% if cards %}
+<form method="post" action="{% url 'build_plan' %}" class="mt-4">
+  {% csrf_token %}
+  {{ plan_form.budget }}
+  {{ plan_form.region }}
+  {{ plan_form.query }}
+  {{ plan_form.procedures }}
+  {{ plan_form.excursions }}
+  {% for card in cards %}
+  <article class="card mb-3">
+    <div class="card-body">
+      {# TODO(team): финальные тексты карточек. Вёрстку делаем сами. #}
+      <h2 class="h5">{{ card.site.institution.name }}</h2>
+      <p>Цена за сутки: {{ card.site.min_daily_price }}–{{ card.site.max_daily_price }}</p>
+      <p>Транспортная доступность: {{ card.site.transport_accessibility }} из 5</p>
+      {% if card.explanation %}
+      <p>{{ card.explanation }}</p>
+      {% endif %}
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="sites" value="{{ card.site.pk }}" id="site-{{ card.site.pk }}" checked>
+        <label class="form-check-label" for="site-{{ card.site.pk }}">Включить в план</label>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+  <button type="submit" class="btn btn-primary">собрать план</button>
+</form>
+{% else %}
+<p class="mt-4">Подходящих площадок нет.</p>
+{% endif %}
+
+<h2 class="h4 mt-5">Изменить запрос</h2>
+{% include "planner/_search_form.html" %}
+{% endblock %}
