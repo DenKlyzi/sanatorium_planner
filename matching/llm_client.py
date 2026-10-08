@@ -47,8 +47,7 @@ def complete(system: str, user: str) -> str:
                 raw = response.read()
             return _message_text(json.loads(raw.decode('utf-8')))
         except HTTPError as exc:
-            exc.close()
-            last_error = exc
+            last_error = _wrap_http_error(exc, url)
         except (URLError, TimeoutError, OSError, UnicodeDecodeError, ValueError) as exc:
             last_error = exc
     if last_error is not None:
@@ -85,8 +84,7 @@ def embed(texts: list[str]) -> list[list[float]]:
                 json.loads(raw.decode('utf-8')), len(texts)
             )
         except HTTPError as exc:
-            exc.close()
-            last_error = exc
+            last_error = _wrap_http_error(exc, url)
         except (URLError, TimeoutError, OSError, UnicodeDecodeError, ValueError) as exc:
             last_error = exc
     if last_error is not None:
@@ -150,3 +148,38 @@ def _embeddings_list(payload: object, expected: int) -> list[list[float]]:
         raise ValueError(
             'В ответе нет data[*].embedding нужной длины.'
         ) from exc
+
+
+def _wrap_http_error(exc: HTTPError, url: str) -> ValueError:
+    """Читает тело HTTP-ошибки и возвращает ValueError с человекочитаемым текстом."""
+    try:
+        raw = exc.read()
+        exc.close()
+        text = raw.decode('utf-8', errors='replace').strip()
+    except Exception:
+        text = ''
+    detail = ''
+    if text:
+        try:
+            payload = json.loads(text)
+            if isinstance(payload, dict):
+                error = payload.get('error')
+                if isinstance(error, dict):
+                    msg = error.get('message') or ''
+                    code = error.get('code') or ''
+                    if isinstance(msg, str) and msg.strip():
+                        detail = msg.strip()
+                        if isinstance(code, str) and code.strip():
+                            detail = f'{detail} [{code.strip()}]'
+                elif isinstance(error, str) and error.strip():
+                    detail = error.strip()
+        except Exception:
+            pass
+        if not detail:
+            snippet = text[:200]
+            detail = snippet + ('…' if len(text) > 200 else '')
+    status = getattr(exc, 'code', exc.status) or '?'
+    msg = f'HTTP {status} {url}'
+    if detail:
+        msg = f'{msg}: {detail}'
+    return ValueError(msg)

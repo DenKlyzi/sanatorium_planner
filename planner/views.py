@@ -16,7 +16,13 @@ from .forms import PlanBuildForm, SearchForm
 from .models import Plan
 
 # TODO(team): текст системного промпта маршрута пишем сами.
-PLAN_SYSTEM_PROMPT = ''
+PLAN_SYSTEM_PROMPT = (
+    'Ты тур-агент, составляющий маршрут по санаториям и площадкам Калужской области. '
+    'Напиши пошаговый текст маршрута на русском языке с учётом бюджета и пожеланий пользователя. '
+    'Для каждой площадки укажи: примерный день визита, как туда добраться, '
+    'стоимость и ключевые процедуры/экскурсии. В конце дай общий бюджетный итог и советы. '
+    'Структурированный текст с заголовками, 150–400 слов, без искусственных эмодзи.'
+)
 
 _MATCH_ERRORS = (OSError, ValueError, RuntimeError, ImportError)
 _LLM_ERRORS = (OSError, ValueError, RuntimeError)
@@ -115,12 +121,16 @@ def build_plan(request: HttpRequest) -> HttpResponse:
 
 def _preferences(cleaned) -> Preferences:
     parts = []
+    if cleaned['region']:
+        parts.append(f'Регион: {cleaned["region"]}')
+    if cleaned['budget'] is not None:
+        parts.append(f'Бюджет за сутки: {cleaned["budget"]}')
     if cleaned['query']:
         parts.append(cleaned['query'])
     if cleaned['procedures']:
-        parts.append(f'Процедуры: {cleaned["procedures"]}')
+        parts.append(f'Желаемые процедуры: {cleaned["procedures"]}')
     if cleaned['excursions']:
-        parts.append(f'Экскурсии: {cleaned["excursions"]}')
+        parts.append(f'Желаемые экскурсии: {cleaned["excursions"]}')
     return Preferences(
         budget=cleaned['budget'],
         region=cleaned['region'],

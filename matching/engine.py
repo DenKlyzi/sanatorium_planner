@@ -14,9 +14,16 @@ from catalog.models import Site
 from matching import llm_client
 
 _TOP_N = 5
+_MIN_SCORE = 0.15
 
-# TODO(team): текст системного промпта пишем сами.
-EXPLAIN_SYSTEM_PROMPT = ''
+EXPLAIN_SYSTEM_PROMPT = (
+    'Ты менеджер по подбору санаториев и площадок для отдыха и лечения. '
+    'Кратко, по пунктам, объясни пользователю на русском языке, '
+    'почему выбранная площадка соответствует его пожеланиям. '
+    'Отдельно отметь совпадения по бюджету, региону, процедурам и экскурсиям. '
+    'Если чего-то не хватает — честно скажи об этом. '
+    'Ответ 3–6 предложений, без вводных фраз вроде «конечно» или «здравствуйте».'
+)
 
 
 def _budget(value) -> Decimal:
@@ -58,13 +65,18 @@ class ScoredSite:
 
 
 def site_text(site: Site) -> str:
-    """Склеивает процедуры, экскурсии и описание учреждения."""
+    """Склеивает информацию о площадке в текст для эмбеддинга."""
     parts = (
-        site.procedures,
-        site.excursions,
+        site.institution.name,
+        site.name,
+        site.address,
         site.institution.description,
+        f'Цена за сутки: {site.min_daily_price}–{site.max_daily_price}',
+        f'Транспортная доступность: {site.transport_accessibility}',
+        f'Процедуры: {site.procedures}',
+        f'Экскурсии: {site.excursions}',
     )
-    return '\n'.join(part.strip() for part in parts if part and part.strip())
+    return '\n'.join(part.strip() for part in parts if part and str(part).strip())
 
 
 def match(preferences: Preferences, *, encoder=None) -> list[ScoredSite]:
@@ -119,6 +131,8 @@ def _rank(query: str, sites: list[Site], encoder) -> list[ScoredSite]:
         similarity = _cosine(query_vector, site_vector)
         # TODO(team): score = w_procedures * процедуры + w_excursions * экскурсии + w_transport * транспорт + w_price * цена. Коэффициенты задаём сами.
         score = similarity
+        if score < _MIN_SCORE:
+            continue
         ranked.append(ScoredSite(site=site, score=score))
     ranked.sort(key=lambda item: (-item.score, item.site.pk))
     return ranked[:_TOP_N]
