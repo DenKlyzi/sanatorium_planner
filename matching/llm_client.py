@@ -1,10 +1,16 @@
 # TODO(team): подставить свой base URL прокси и модель, ключ только из окружения.
 
+import os
 import json
+
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from dotenv import load_dotenv
+
 from django.conf import settings
+
+load_dotenv()
 
 _TIMEOUT_SECONDS = 30
 _ATTEMPTS = 2
@@ -14,10 +20,9 @@ def complete(system: str, user: str) -> str:
     """Возвращает текст ответа модели на сообщения system и user."""
     if not isinstance(system, str) or not isinstance(user, str):
         raise TypeError('system и user должны быть строками.')
-
-    base_url = _required_text('LLM_BASE_URL')
-    api_key = _required_text('LLM_API_KEY')
-    model = _required_text('LLM_MODEL')
+    base_url = _required_text(os.getenv('LLM_BASE_URL'))
+    api_key = _required_text(os.getenv('LLM_API_KEY'))
+    model = _required_text(os.getenv('LLM_MODEL'))
     url = _chat_completions_url(base_url)
     body = json.dumps(
         {
