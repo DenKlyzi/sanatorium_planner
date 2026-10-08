@@ -14,7 +14,6 @@ from catalog.models import Site
 from matching import llm_client
 
 _TOP_N = 5
-_model = None
 
 # TODO(team): текст системного промпта пишем сами.
 EXPLAIN_SYSTEM_PROMPT = ''
@@ -127,26 +126,10 @@ def _rank(query: str, sites: list[Site], encoder) -> list[ScoredSite]:
 
 def _encode(texts: list[str], encoder) -> list[list[float]]:
     if encoder is None:
-        raw = _embedding_model().encode(
-            texts,
-            show_progress_bar=False,
-            normalize_embeddings=True,
-        )
+        raw = llm_client.embed(texts)
     else:
         raw = encoder.encode(texts)
     return [_vector(item) for item in raw]
-
-
-def _embedding_model():
-    global _model
-    if _model is None:
-        from sentence_transformers import SentenceTransformer
-
-        name = getattr(settings, 'EMBEDDING_MODEL', '')
-        if not isinstance(name, str) or not name.strip():
-            raise ValueError('EMBEDDING_MODEL не задан.')
-        _model = SentenceTransformer(name.strip())
-    return _model
 
 
 def _vector(raw) -> list[float]:

@@ -174,7 +174,7 @@ class SearchViewTests(TestCase):
 
     @patch('planner.views.match')
     def test_match_failure_does_not_explain(self, match):
-        match.side_effect = ImportError('sentence_transformers')
+        match.side_effect = ValueError('LLM_BASE_URL не задан')
 
         with patch('planner.views.explain') as explain:
             response = self.client.post(

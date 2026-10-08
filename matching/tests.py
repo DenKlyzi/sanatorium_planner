@@ -1,5 +1,3 @@
-import sys
-import types
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
@@ -113,10 +111,6 @@ class ExplainTests(SimpleTestCase):
 
 
 class MatchTests(TestCase):
-    def tearDown(self):
-        engine._model = None
-        super().tearDown()
-
     def make_site(
         self,
         address,
@@ -241,8 +235,8 @@ class MatchTests(TestCase):
 
         self.assertEqual(result, [])
 
-    @override_settings(EMBEDDING_MODEL='team/custom-model')
-    def test_local_model_name_comes_from_settings(self):
+    @patch('matching.engine.llm_client.embed')
+    def test_embed_via_api_passes_texts_correctly(self, embed):
         site = self.make_site(
             'Крым, Ялта',
             '1000',
@@ -250,29 +244,13 @@ class MatchTests(TestCase):
             excursions='набережная',
             description='Парк у моря',
         )
-        created = []
-        encoded = {}
+        embed.return_value = [[1.0, 0.0], [1.0, 0.0]]
 
-        class FakeSentenceTransformer:
-            def __init__(self, model_name):
-                created.append(model_name)
+        result = engine.match(Preferences(budget=5000, region='Крым', query='ванны'))
 
-            def encode(self, texts, show_progress_bar=None, normalize_embeddings=False):
-                encoded['texts'] = list(texts)
-                encoded['show_progress_bar'] = show_progress_bar
-                encoded['normalize_embeddings'] = normalize_embeddings
-                return [[1.0, 0.0] for _ in texts]
-
-        fake_module = types.ModuleType('sentence_transformers')
-        fake_module.SentenceTransformer = FakeSentenceTransformer
-        with patch.dict(sys.modules, {'sentence_transformers': fake_module}):
-            result = engine.match(Preferences(budget=5000, region='Крым', query='ванны'))
-
-        self.assertEqual(created, ['team/custom-model'])
-        self.assertEqual(encoded['show_progress_bar'], False)
-        self.assertEqual(encoded['normalize_embeddings'], True)
+        embed.assert_called_once()
         self.assertEqual(
-            encoded['texts'],
+            embed.call_args.args[0],
             ['ванны', 'ванны\nнабережная\nПарк у моря'],
         )
         self.assertEqual(result[0].site.pk, site.pk)

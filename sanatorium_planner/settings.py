@@ -133,9 +133,6 @@ LLM_BASE_URL = os.environ.get('LLM_BASE_URL', '')
 LLM_API_KEY = os.environ.get('LLM_API_KEY', '')
 LLM_MODEL = os.environ.get('LLM_MODEL', '')
 
-# Локальная модель sentence-transformers для эмбеддингов подбора.
-# Пустая переменная EMBEDDING_MODEL оставляет модель по умолчанию.
-EMBEDDING_MODEL = (
-    os.environ.get('EMBEDDING_MODEL', '').strip()
-    or 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
-)
+# Имя модели эмбеддингов на прокси (например text-embedding-3-small
+# или embed-multilingual-v3.0). Значение только из окружения.
+EMBEDDING_MODEL_NAME = os.environ.get('EMBEDDING_MODEL_NAME', '')

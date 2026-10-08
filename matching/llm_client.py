@@ -56,6 +56,44 @@ def complete(system: str, user: str) -> str:
     raise RuntimeError('Запрос к прокси не выполнен.')
 
 
+def embed(texts: list[str]) -> list[list[float]]:
+    """Возвращает эмбеддинги списка текстов через /embeddings прокси."""
+    if not isinstance(texts, list) or not all(
+        isinstance(t, str) for t in texts
+    ):
+        raise TypeError('texts должен быть списком непустых строк.')
+    base_url = _required_text(os.getenv('LLM_BASE_URL'))
+    api_key = _required_text(os.getenv('LLM_API_KEY'))
+    model = _required_text(os.getenv('EMBEDDING_MODEL_NAME'))
+    url = _embeddings_url(base_url)
+    body = json.dumps(
+        {'model': model, 'input': texts},
+        ensure_ascii=False,
+    ).encode('utf-8')
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+    }
+
+    last_error: Exception | None = None
+    for _attempt in range(_ATTEMPTS):
+        request = Request(url, data=body, headers=headers, method='POST')
+        try:
+            with urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
+                raw = response.read()
+            return _embeddings_list(
+                json.loads(raw.decode('utf-8')), len(texts)
+            )
+        except HTTPError as exc:
+            exc.close()
+            last_error = exc
+        except (URLError, TimeoutError, OSError, UnicodeDecodeError, ValueError) as exc:
+            last_error = exc
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError('Запрос к прокси не выполнен.')
+
+
 def _required_text(name: str) -> str:
     value = getattr(settings, name, '')
     if isinstance(value, str) and value.strip():
@@ -73,6 +111,13 @@ def _chat_completions_url(base_url: str) -> str:
     return f'{base}/chat/completions'
 
 
+def _embeddings_url(base_url: str) -> str:
+    base = base_url.rstrip('/')
+    if base.endswith('/embeddings'):
+        return base
+    return f'{base}/embeddings'
+
+
 def _message_text(payload: object) -> str:
     if not isinstance(payload, dict):
         raise ValueError('Ответ прокси не является JSON-объектом.')
@@ -83,3 +128,23 @@ def _message_text(payload: object) -> str:
     if not isinstance(content, str):
         raise ValueError('Текст ответа модели не строка.')
     return content
+
+
+def _embeddings_list(payload: object, expected: int) -> list[list[float]]:
+    if not isinstance(payload, dict):
+        raise ValueError('Ответ прокси не является JSON-объектом.')
+    try:
+        data = payload['data']
+        if not isinstance(data, list) or len(data) != expected:
+            raise ValueError
+        result: list[list[float]] = []
+        for item in data:
+            vector = item['embedding']
+            if not isinstance(vector, list):
+                raise ValueError
+            result.append([float(v) for v in vector])
+        return result
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
+        raise ValueError(
+            'В ответе нет data[*].embedding нужной длины.'
+        ) from exc
