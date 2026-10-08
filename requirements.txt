@@ -1,2 +1,0 @@
-Django==5.2.18
-sentence-transformers==6.1.0
