@@ -276,7 +276,7 @@ class MatchTests(TestCase):
         self.assertNotIn(engine.site_text(dropped), encoder.texts)
         complete.assert_not_called()
 
-    # TODO(team): на кейс нескольких площадок одного учреждения — этот сценарий из задания проверяем вручную на своих данных.
+
     @patch('matching.engine.llm_client.complete')
     def test_two_sites_of_one_institution_are_returned_separately(self, complete):
         institution = Institution.objects.create(

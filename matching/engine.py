@@ -16,13 +16,30 @@ from matching import llm_client
 _TOP_N = 5
 _MIN_SCORE = 0.15
 
+# Веса компонентов итогового score. Сумма = 1.0.
+_W_SIMILARITY = 0.5
+_W_PROCEDURES = 0.2
+_W_EXCURSIONS = 0.1
+_W_TRANSPORT  = 0.1
+_W_PRICE      = 0.1
+
+_STOP_WORDS = {
+    'и', 'в', 'на', 'с', 'для', 'по', 'от', 'до', 'не', 'или', 'а',
+    'но', 'что', 'как', 'это', 'мне', 'мы', 'вы', 'он', 'она', 'они',
+    'хочу', 'нужно', 'можно', 'быть', 'есть',
+}
+
 EXPLAIN_SYSTEM_PROMPT = (
     'Ты менеджер по подбору санаториев и площадок для отдыха и лечения. '
-    'Кратко, по пунктам, объясни пользователю на русском языке, '
-    'почему выбранная площадка соответствует его пожеланиям. '
-    'Отдельно отметь совпадения по бюджету, региону, процедурам и экскурсиям. '
-    'Если чего-то не хватает — честно скажи об этом. '
-    'Ответ 3–6 предложений, без вводных фраз вроде «конечно» или «здравствуйте».'
+    'Объясни пользователю на русском языке, почему выбранная площадка '
+    'соответствует его пожеланиям. Отметь совпадения по бюджету, региону, '
+    'процедурам и экскурсиям. Если чего-то не хватает — честно скажи об этом. '
+    'Формат ответа: сплошной текст из 3–6 предложений. '
+    'Не используй Markdown: никаких **, ##, списков через дефис, таблиц и ссылок. '
+    'Не используй вводные фразы вроде «конечно», «здравствуйте», «разумеется». '
+    'Все числа (цены, сроки, длительность курса, расстояния) пиши цифрами, '
+    'а не словами. '
+    'Не повторяй название площадки больше одного раза.'
 )
 
 
@@ -80,9 +97,9 @@ def site_text(site: Site) -> str:
 
 
 def match(preferences: Preferences, *, encoder=None) -> list[ScoredSite]:
-    """Возвращает до 5 площадок с score косинусной близости."""
+    """Возвращает до 5 площадок с итоговым score."""
     sites = _filter_sites(preferences.budget, preferences.region)
-    return _rank(preferences.query, sites, encoder)
+    return _rank(preferences.query, sites, encoder, budget=preferences.budget)
 
 
 def explain(preferences: Preferences, site: Site) -> str:
@@ -115,11 +132,16 @@ def _filter_sites(budget: Decimal, region: str) -> list[Site]:
     folded = region.casefold()
     if not folded:
         return list(queryset)
-    # SQLite не меняет регистр кириллицы в LIKE, поэтому регион сравниваем в Python.
     return [site for site in queryset if folded in site.address.casefold()]
 
 
-def _rank(query: str, sites: list[Site], encoder) -> list[ScoredSite]:
+def _rank(
+    query: str,
+    sites: list[Site],
+    encoder,
+    *,
+    budget: Decimal,
+) -> list[ScoredSite]:
     if not sites:
         return []
     vectors = _encode([query, *[site_text(site) for site in sites]], encoder)
@@ -129,13 +151,65 @@ def _rank(query: str, sites: list[Site], encoder) -> list[ScoredSite]:
     ranked: list[ScoredSite] = []
     for site, site_vector in zip(sites, vectors[1:], strict=True):
         similarity = _cosine(query_vector, site_vector)
-        # TODO(team): score = w_procedures * процедуры + w_excursions * экскурсии + w_transport * транспорт + w_price * цена. Коэффициенты задаём сами.
-        score = similarity
+
+        score = (
+            _W_SIMILARITY * similarity
+            + _W_PROCEDURES * _text_overlap(query, site.procedures)
+            + _W_EXCURSIONS * _text_overlap(query, site.excursions)
+            + _W_TRANSPORT * _transport_score(site.transport_accessibility)
+            + _W_PRICE * _price_score(site.min_daily_price, budget)
+        )
+
         if score < _MIN_SCORE:
             continue
         ranked.append(ScoredSite(site=site, score=score))
     ranked.sort(key=lambda item: (-item.score, item.site.pk))
     return ranked[:_TOP_N]
+
+
+def _text_overlap(query: str, field_value: str | None) -> float:
+    """Доля значимых слов запроса, которые встречаются в поле площадки.
+
+    Возвращает 0..1. Грубая, но рабочая эвристика для процедур и экскурсий,
+    так как в Preferences нет структурированных предпочтений по ним.
+    """
+    if not query or not field_value:
+        return 0.0
+    words = {
+        w.strip('.,;:!?()«»"\'').lower()
+        for w in query.split()
+        if len(w) > 2 and w.lower() not in _STOP_WORDS
+    }
+    if not words:
+        return 0.0
+    haystack = str(field_value).lower()
+    hits = sum(1 for w in words if w in haystack)
+    return hits / len(words)
+
+
+def _transport_score(level) -> float:
+    """Транспортная доступность 1..5 → 0..1."""
+    if level is None:
+        return 0.0
+    try:
+        level = int(level)
+    except (TypeError, ValueError):
+        return 0.0
+    level = max(1, min(5, level))
+    return (level - 1) / 4.0
+
+
+def _price_score(price, budget: Decimal) -> float:
+    """Чем дешевле относительно бюджета, тем выше. 0..1."""
+    if price is None or budget <= 0:
+        return 0.5  # нет данных — нейтрально
+    try:
+        price = Decimal(str(price))
+    except (InvalidOperation, ValueError):
+        return 0.5
+    if price > budget:
+        return 0.0
+    return float(1 - (price / budget))
 
 
 def _encode(texts: list[str], encoder) -> list[list[float]]:

@@ -70,7 +70,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        # TODO(team): перед загрузкой: здесь мы сами наполним 30–80 реальных объектов из открытых источников, демо-строки только как пример схемы. Не парси внешние сайты.
         csv_text = self._read_csv(options['csv_path'])
         rows = self._parse_rows(csv_text)
         with transaction.atomic():

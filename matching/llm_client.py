@@ -1,5 +1,3 @@
-# TODO(team): подставить свой base URL прокси и модель, ключ только из окружения.
-
 import os
 import json
 
