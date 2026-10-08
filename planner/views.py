@@ -41,11 +41,15 @@ def search(request: HttpRequest) -> HttpResponse:
     preferences = _preferences(form.cleaned_data)
     try:
         scored = match(preferences)
-    except _MATCH_ERRORS:
+    except _MATCH_ERRORS as exc:
+        detail = str(exc).strip() if str(exc).strip() else 'Неизвестная ошибка.'
         return render(
             request,
             'planner/search.html',
-            {'form': form, 'match_error': 'Не удалось подобрать площадки.'},
+            {
+                'form': form,
+                'match_error': f'Не удалось подобрать площадки: {detail}',
+            },
             status=503,
         )
 
@@ -56,8 +60,9 @@ def search(request: HttpRequest) -> HttpResponse:
         if explain_error is None:
             try:
                 explanation = explain(preferences, item.site)
-            except _LLM_ERRORS:
-                explain_error = 'Не удалось получить объяснение.'
+            except _LLM_ERRORS as exc:
+                detail = str(exc).strip() if str(exc).strip() else 'неизвестная ошибка'
+                explain_error = f'Не удалось получить объяснение: {detail}.'
         cards.append(SiteCard(site=item.site, explanation=explanation))
 
     return render(
@@ -85,11 +90,12 @@ def build_plan(request: HttpRequest) -> HttpResponse:
             PLAN_SYSTEM_PROMPT,
             _route_user_text(form.cleaned_data, sites),
         ).strip()
-    except _LLM_ERRORS:
+    except _LLM_ERRORS as exc:
+        detail = str(exc).strip() if str(exc).strip() else 'неизвестная ошибка'
         return render(
             request,
             'planner/plan_error.html',
-            {'error': 'Не удалось собрать маршрут.'},
+            {'error': f'Не удалось собрать маршрут: {detail}.'},
             status=502,
         )
     if not route_text:

@@ -20,9 +20,9 @@ def complete(system: str, user: str) -> str:
     """Возвращает текст ответа модели на сообщения system и user."""
     if not isinstance(system, str) or not isinstance(user, str):
         raise TypeError('system и user должны быть строками.')
-    base_url = _required_text(os.getenv('LLM_BASE_URL'))
-    api_key = _required_text(os.getenv('LLM_API_KEY'))
-    model = _required_text(os.getenv('LLM_MODEL'))
+    base_url = _required_text('LLM_BASE_URL')
+    api_key = _required_text('LLM_API_KEY')
+    model = _required_text('LLM_MODEL')
     url = _chat_completions_url(base_url)
     body = json.dumps(
         {
@@ -62,9 +62,9 @@ def embed(texts: list[str]) -> list[list[float]]:
         isinstance(t, str) for t in texts
     ):
         raise TypeError('texts должен быть списком непустых строк.')
-    base_url = _required_text(os.getenv('LLM_BASE_URL'))
-    api_key = _required_text(os.getenv('LLM_API_KEY'))
-    model = _required_text(os.getenv('EMBEDDING_MODEL_NAME'))
+    base_url = _required_text('LLM_BASE_URL')
+    api_key = _required_text('LLM_API_KEY')
+    model = _required_text('EMBEDDING_MODEL_NAME')
     url = _embeddings_url(base_url)
     body = json.dumps(
         {'model': model, 'input': texts},
