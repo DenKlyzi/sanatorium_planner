@@ -62,9 +62,12 @@ class Site(models.Model):
     )
     procedures = models.TextField('текст процедур')
     excursions = models.TextField('текст экскурсий')
-    # TODO(team): сезон
-    # TODO(team): доступность для маломобильных
-    # TODO(team): рейтинг
+    # season = models.TextField('сезон')
+    # limited_mobility_people = models.PositiveSmallIntegerField()
+    # rating = models.PositiveSmallIntegerField()
+    # # TODO(team): сезон
+    # # TODO(team): доступность для маломобильных
+    # # TODO(team): рейтинг
 
     class Meta:
         verbose_name = 'площадка'
