@@ -18,6 +18,8 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
+from .views import RegisterView
+
 from planner.forms import BootstrapAuthenticationForm
 
 urlpatterns = [
@@ -27,5 +29,6 @@ urlpatterns = [
         auth_views.LoginView.as_view(authentication_form=BootstrapAuthenticationForm),
         name='login',
     ),
+    path('register/', RegisterView.as_view(), name='register'),
     path('admin/', admin.site.urls),
 ]

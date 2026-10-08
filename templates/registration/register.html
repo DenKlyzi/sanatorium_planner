@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Вход{% endblock %}
+{% block title %}Регистрация{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4">Вход</h1>
-<form method="post" action="{% url 'login' %}">
+<h1 class="h3 mb-4">Регистрация</h1>
+<form method="post" action="{% url 'register' %}">
   {% csrf_token %}
   {% if form.non_field_errors %}
   <div class="alert alert-danger">{{ form.non_field_errors }}</div>
@@ -13,15 +13,17 @@
   <div class="mb-3">
     <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
     {{ field }}
+    {% if field.help_text %}
+    <div class="form-text">{{ field.help_text|safe }}</div>
+    {% endif %}
     {% for error in field.errors %}
     <div class="form-text text-danger">{{ error }}</div>
     {% endfor %}
   </div>
   {% endfor %}
-  <input type="hidden" name="next" value="{{ next }}">
-  <button type="submit" class="btn btn-primary">Войти</button>
+  <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
 </form>
 <p class="mt-3 text-center">
-  Нет аккаунта? <a href="{% url 'register' %}">Регистрация</a>
+  Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a>
 </p>
 {% endblock %}
