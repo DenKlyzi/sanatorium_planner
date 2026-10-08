@@ -68,7 +68,7 @@ def site_text(site: Site) -> str:
     """Склеивает информацию о площадке в текст для эмбеддинга."""
     parts = (
         site.institution.name,
-        site.name,
+        site.institution.treatment_profile,
         site.address,
         site.institution.description,
         f'Цена за сутки: {site.min_daily_price}–{site.max_daily_price}',

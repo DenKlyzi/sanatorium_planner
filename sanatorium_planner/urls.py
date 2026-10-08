@@ -30,5 +30,6 @@ urlpatterns = [
         name='login',
     ),
     path('register/', RegisterView.as_view(), name='register'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('admin/', admin.site.urls),
 ]
