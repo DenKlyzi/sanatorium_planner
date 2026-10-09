@@ -1,21 +1,43 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Санатории{% endblock %}</title>
-    {% load static %}
-    <link href="{% static 'style.css' %}" rel="stylesheet">
+  <link href="{% static 'style.css' %}" rel="stylesheet">
 </head>
 <body>
-    {% if user.is_authenticated %}
-  <span class="navbar-text me-3">{{ user.username }}</span>
-  <form method="post" action="{% url 'logout' %}" class="d-inline">
-    {% csrf_token %}
-    <button type="submit" class="btn btn-outline-secondary btn-sm">Выйти</button>
-  </form>
-    {% endif %}
+  <header class="navbar">
+    <div class="navbar__inner">
+      <a href="{% url 'search' %}" class="navbar__brand">
+        <span class="navbar__logo">🏖️</span>
+        <span class="navbar__title">Санатории</span>
+      </a>
+
+      {% if user.is_authenticated %}
+        <nav class="navbar__links">
+          <a href="{% url 'plan_list' %}" class="navbar__link">Мои планы</a>
+        </nav>
+        <div class="navbar__user">
+          <span class="navbar__username">
+            <span class="navbar__user-icon">👤</span>{{ user.username }}
+          </span>
+          <form method="post" action="{% url 'logout' %}" class="navbar__logout">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline btn-sm">Выйти</button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </header>
+
   <main class="container py-4">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
 </body>

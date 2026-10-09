@@ -2,10 +2,11 @@
 
 from dataclasses import dataclass
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
 from catalog.models import Site
@@ -15,14 +16,13 @@ from matching.engine import Preferences, explain, match
 from .forms import PlanBuildForm, SearchForm
 from .models import Plan
 
+
 PLAN_SYSTEM_PROMPT = (
     'Ты тур-агент, составляющий маршрут по санаториям и площадкам Калужской области. '
     'Напиши пошаговый текст маршрута на русском языке с учётом бюджета и пожеланий пользователя. '
     'Для каждой площадки укажи: примерный день визита, как туда добраться, '
-    'стоимость и ключевые процедуры/экскурсии. В конце дай общий бюджетный итог и советы. '
-    'Структурированный текст с заголовками, 150–400 слов, без искусственных эмодзи.'
-    'Можешь так же разбить посещение санатория на несколько дней.'
-    'Так же оформляй текст красиво, можешь использовать смайлики и пока что без MD давай.'
+    'стоимость и ключевые процедуры и экскурсии. В конце дай общий бюджетный итог и советы. '
+    'Структурированный текст с заголовками, 150–400 слов. Без эмодзи.'
 )
 
 _MATCH_ERRORS = (OSError, ValueError, RuntimeError, ImportError)
@@ -55,7 +55,7 @@ def search(request: HttpRequest) -> HttpResponse:
             'planner/search.html',
             {
                 'form': form,
-                'match_error': f'Не удалось подобрать площадки: {detail}',
+                'match_error': f'Не удалось подобрать площадки. {detail}',
             },
             status=503,
         )
@@ -69,7 +69,7 @@ def search(request: HttpRequest) -> HttpResponse:
                 explanation = explain(preferences, item.site)
             except _LLM_ERRORS as exc:
                 detail = str(exc).strip() if str(exc).strip() else 'неизвестная ошибка'
-                explain_error = f'Не удалось получить объяснение: {detail}.'
+                explain_error = f'Не удалось получить объяснение. {detail}.'
         cards.append(SiteCard(site=item.site, explanation=explanation))
 
     return render(
@@ -102,7 +102,7 @@ def build_plan(request: HttpRequest) -> HttpResponse:
         return render(
             request,
             'planner/plan_error.html',
-            {'error': f'Не удалось собрать маршрут: {detail}.'},
+            {'error': f'Не удалось собрать маршрут. {detail}.'},
             status=502,
         )
     if not route_text:
@@ -114,10 +114,46 @@ def build_plan(request: HttpRequest) -> HttpResponse:
         )
 
     with transaction.atomic():
-        plan = Plan.objects.create(user=request.user, route_text=route_text)
+        plan = Plan.objects.create(
+            user=request.user,
+            route_text=route_text,
+        )
         plan.sites.set(sites)
 
-    return render(request, 'planner/plan.html', {'plan': plan, 'sites': sites})
+    return redirect('plan_detail', pk=plan.pk)
+
+
+@login_required
+def plan_list(request: HttpRequest) -> HttpResponse:
+    """Список показывает только планы текущего пользователя."""
+    plans = (
+        Plan.objects
+        .filter(user=request.user)
+        .prefetch_related('sites__institution')
+        .order_by('-id')
+    )
+    return render(request, 'planner/plan_list.html', {'plans': plans})
+
+
+@login_required
+def plan_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    """Чужой план по прямой ссылке недоступен."""
+    plan = get_object_or_404(Plan, pk=pk, user=request.user)
+    sites = plan.sites.select_related('institution').all()
+    return render(request, 'planner/plan.html', {
+        'plan': plan,
+        'sites': sites,
+    })
+
+
+@login_required
+@require_POST
+def plan_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    """Удаление удаляет только свой план."""
+    plan = get_object_or_404(Plan, pk=pk, user=request.user)
+    plan.delete()
+    messages.success(request, 'План удалён.')
+    return redirect('plan_list')
 
 
 def _preferences(cleaned) -> Preferences:

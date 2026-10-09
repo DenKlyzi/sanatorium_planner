@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Мои планы{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Мои планы</h1>
+  <p class="page-subtitle">Сохранённые маршруты</p>
+</div>
+
+{% if plans %}
+  <div class="plans-list">
+    {% for plan in plans %}
+      <article class="plan-item">
+        <div class="plan-item__main">
+          <h2 class="plan-item__title">
+            <a href="{% url 'plan_detail' plan.pk %}">План #{{ plan.pk }}</a>
+          </h2>
+          <p class="plan-item__meta">
+            Площадок: <b>{{ plan.sites.count }}</b>
+          </p>
+          {% if plan.route_text %}
+            <p class="plan-item__query">
+              {{ plan.route_text|truncatechars:140 }}
+            </p>
+          {% endif %}
+        </div>
+        <div class="plan-item__actions">
+          <a href="{% url 'plan_detail' plan.pk %}" class="btn btn-outline btn-sm">Открыть</a>
+          <form method="post" action="{% url 'plan_delete' plan.pk %}" class="inline-form">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-ghost btn-sm">Удалить</button>
+</form>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state__icon">🗺️</div>
+    <h2>Планов пока нет</h2>
+    <p>Найдите площадки и соберите первый план.</p>
+    <a href="{% url 'search' %}" class="btn btn-primary">Начать подбор</a>
+  </div>
+{% endif %}
+{% endblock %}
