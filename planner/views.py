@@ -209,24 +209,42 @@ def _ordered_sites(chosen, posted_ids) -> list[Site]:
 
 
 def _route_user_text(cleaned, sites: list[Site]) -> str:
-    lines = [
-        'Составь текст маршрута по выбранным площадкам.',
-        f'Бюджет за сутки: {cleaned["budget"]}',
-        f'Регион: {cleaned["region"]}',
-        f'Пожелания: {cleaned["query"]}',
-        f'Желаемые процедуры: {cleaned["procedures"]}',
-        f'Желаемые экскурсии: {cleaned["excursions"]}',
-        'Площадки:',
-    ]
-    for site in sites:
-        lines.extend(
-            (
-                f'Учреждение: {site.institution.name}',
-                f'Адрес: {site.address}',
-                f'Цена за сутки: {site.min_daily_price}–{site.max_daily_price}',
-                f'Транспортная доступность: {site.transport_accessibility}',
-                f'Процедуры: {site.procedures}',
-                f'Экскурсии: {site.excursions}',
-            )
-        )
+    lines = ['Составь текст маршрута по выбранным площадкам.']
+
+    if cleaned['region']:
+        lines.append(f'Регион: {cleaned["region"]}')
+    if cleaned['budget'] is not None:
+        lines.append(f'Бюджет за сутки: {cleaned["budget"]}')
+    if cleaned['query']:
+        lines.append(f'Пожелания: {cleaned["query"]}')
+    if cleaned['procedures']:
+        lines.append(f'Желаемые процедуры: {cleaned["procedures"]}')
+    if cleaned['excursions']:
+        lines.append(f'Желаемые экскурсии: {cleaned["excursions"]}')
+
+    lines.append('')
+    lines.append('Площадки (в порядке посещения):')
+    for i, site in enumerate(sites, 1):
+        lines.append(f'{i}. {site.institution.name}')
+        if getattr(site, 'address', None):
+            lines.append(f'   Адрес: {site.address}')
+        if site.min_daily_price is not None and site.max_daily_price is not None:
+            lines.append(f'   Цена за сутки: {site.min_daily_price}–{site.max_daily_price} ₽')
+        elif site.min_daily_price is not None:
+            lines.append(f'   Цена за сутки: от {site.min_daily_price} ₽')
+        if getattr(site, 'transport_accessibility', None) is not None:
+            lines.append(f'   Транспортная доступность: {site.transport_accessibility} из 5')
+        if getattr(site, 'procedures', None):
+            lines.append(f'   Процедуры: {site.procedures}')
+        if getattr(site, 'excursions', None):
+            lines.append(f'   Экскурсии: {site.excursions}')
+
+    lines.append('')
+    lines.append('Требования к тексту:')
+    lines.append('- Язык: русский. Без эмодзи.')
+    lines.append('- Порядок площадок — строго как в списке выше.')
+    lines.append('- Цены и сроки бери только из переданных данных, не придумывай.')
+    lines.append('- Для каждой площадки: день визита, как добраться, стоимость, ключевые процедуры и экскурсии.')
+    lines.append('- В конце — общий бюджетный итог и 2–3 совета.')
+
     return '\n'.join(lines)
