@@ -1,48 +1,195 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Результаты подбора{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4">Результаты подбора</h1>
+<div class="page-header">
+  <h1>Результаты подбора</h1>
+  <p class="page-subtitle">Отметьте площадки, которые хотите включить в план</p>
+</div>
 
-{# TODO(team): блок карты Leaflet. Вёрстку и карту делаем сами. Платные картографические ключи не подключаем. #}
-<div id="leaflet-map"></div>
+<div id="yandex-map" class="map-container"></div>
+{% if not cards %}
+  <p class="map-empty-hint">На карте пока нет площадок — попробуйте изменить запрос.</p>
+{% endif %}
 
 {% if explain_error %}
-<div class="alert alert-warning mt-3">{{ explain_error }}</div>
+  <div class="alert alert-warning">{{ explain_error }}</div>
 {% endif %}
 
 {% if cards %}
-<form method="post" action="{% url 'build_plan' %}" class="mt-4">
+<form method="post" action="{% url 'build_plan' %}" class="results-form">
   {% csrf_token %}
   {{ plan_form.budget }}
   {{ plan_form.region }}
   {{ plan_form.query }}
   {{ plan_form.procedures }}
   {{ plan_form.excursions }}
-  {% for card in cards %}
-  <article class="card mb-3">
-    <div class="card-body">
-      {# TODO(team): финальные тексты карточек. Вёрстку делаем сами. #}
-      <h2 class="h5">{{ card.site.institution.name }}</h2>
-      <p>Цена за сутки: {{ card.site.min_daily_price }}–{{ card.site.max_daily_price }}</p>
-      <p>Транспортная доступность: {{ card.site.transport_accessibility }} из 5</p>
-      {% if card.explanation %}
-      <p>{{ card.explanation }}</p>
-      {% endif %}
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="sites" value="{{ card.site.pk }}" id="site-{{ card.site.pk }}" checked>
-        <label class="form-check-label" for="site-{{ card.site.pk }}">Включить в план</label>
-      </div>
-    </div>
-  </article>
-  {% endfor %}
-  <button type="submit" class="btn btn-primary">собрать план</button>
+
+  <div class="cards-grid">
+    {% for card in cards %}
+      <article class="card site-card"
+               id="site-card-{{ card.site.pk }}"
+               data-lat="{{ card.site.latitude }}"
+               data-lon="{{ card.site.longitude }}"
+               data-site-id="{{ card.site.pk }}">
+
+        <header class="site-card__head">
+          <h2 class="site-card__title">{{ card.site.institution.name }}</h2>
+          {% if card.site.institution.profile %}
+            <span class="badge">{{ card.site.institution.profile }}</span>
+          {% endif %}
+        </header>
+
+        {% if card.site.institution.address %}
+          <p class="site-card__address">
+            <span class="icon">📍</span>{{ card.site.institution.address }}
+          </p>
+        {% endif %}
+
+        {% if card.site.institution.description %}
+          <p class="site-card__desc">{{ card.site.institution.description }}</p>
+        {% endif %}
+
+        <dl class="site-card__meta">
+          <div>
+            <dt>Цена за сутки</dt>
+            <dd>{{ card.site.min_daily_price }}–{{ card.site.max_daily_price }} ₽</dd>
+          </div>
+          <div>
+            <dt>Транспорт</dt>
+            <dd>
+              <span class="rating" title="{{ card.site.transport_accessibility }} из 5">
+                {% for i in "12345" %}
+                  <span class="rating__dot {% if forloop.counter <= card.site.transport_accessibility %}is-on{% endif %}"></span>
+                {% endfor %}
+              </span>
+            </dd>
+          </div>
+        </dl>
+
+        {% if card.site.procedures.all %}
+          <div class="site-card__tags">
+            <span class="tags-label">Процедуры:</span>
+            {% for p in card.site.procedures.all %}
+              <span class="tag">{{ p.name }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% if card.site.excursions.all %}
+          <div class="site-card__tags">
+            <span class="tags-label">Экскурсии:</span>
+            {% for e in card.site.excursions.all %}
+              <span class="tag tag--alt">{{ e.name }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% if card.explanation %}
+          <div class="site-card__explain">
+            {{ card.explanation }}
+          </div>
+        {% endif %}
+
+        <label class="site-card__check">
+          <input type="checkbox" name="sites" value="{{ card.site.pk }}" checked>
+          <span>Включить в план</span>
+        </label>
+      </article>
+    {% endfor %}
+  </div>
+
+  <div class="results-actions">
+    <button type="submit" class="btn btn-primary btn-lg">
+      <span class="icon">🗺️</span> Собрать план
+    </button>
+  </div>
 </form>
 {% else %}
-<p class="mt-4">Подходящих площадок нет.</p>
+  <div class="empty-state">
+    <div class="empty-state__icon">🔍</div>
+    <h2>Подходящих площадок нет</h2>
+    <p>Попробуйте изменить процедуры, экскурсии или регион.</p>
+  </div>
 {% endif %}
 
-<h2 class="h4 mt-5">Изменить запрос</h2>
-{% include "planner/_search_form.html" %}
+<section class="search-again">
+  <h2 class="h4">Изменить запрос</h2>
+  {% include "planner/_search_form.html" %}
+</section>
+
+<script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey={{ YANDEX_MAPS_API_KEY }}"></script>
+
+<script>
+(function () {
+  var container = document.getElementById('yandex-map');
+  if (!container) return;
+
+  if (typeof ymaps === 'undefined') {
+    container.innerHTML = '<div class="map-fallback">Карта недоступна</div>';
+    return;
+  }
+
+  ymaps.ready(function () {
+    var map = new ymaps.Map(container, {
+      center: [55.751244, 37.618423],
+      zoom: 5,
+      controls: ['zoomControl', 'fullscreenControl']
+    }, {
+      suppressMapOpenBlock: true
+    });
+
+    var cards = document.querySelectorAll('.site-card[data-lat][data-lon]');
+    var minLat =  90, maxLat = -90, minLon =  180, maxLon = -180;
+    var count = 0;
+
+    cards.forEach(function (card) {
+      var lat = parseFloat(card.dataset.lat);
+      var lon = parseFloat(card.dataset.lon);
+      if (!isFinite(lat) || !isFinite(lon)) return;
+
+      var titleEl = card.querySelector('.site-card__title');
+      var title = titleEl ? titleEl.textContent.trim() : 'Площадка';
+
+      var placemark = new ymaps.Placemark([lat, lon], {
+        balloonContentHeader: title,
+        hintContent: title
+      }, {
+        preset: 'islands#blueIcon'
+      });
+
+      placemark.events.add('click', function () {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.classList.add('is-highlighted');
+        setTimeout(function () { card.classList.remove('is-highlighted'); }, 1500);
+      });
+
+      map.geoObjects.add(placemark);
+      count++;
+
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lon < minLon) minLon = lon;
+      if (lon > maxLon) maxLon = lon;
+    });
+
+    if (count === 1) {
+      map.setCenter([minLat, minLon], 12);
+    } else if (count > 1) {
+      var centerLat = (minLat + maxLat) / 2;
+      var centerLon = (minLon + maxLon) / 2;
+      map.setCenter([centerLat, centerLon], 5);
+
+      try {
+        map.setBounds([[minLat, minLon], [maxLat, maxLon]], {
+          checkZoomRange: true,
+          zoomMargin: 40
+        });
+      } catch (e) {}
+    }
+  });
+})();
+</script>
 {% endblock %}
