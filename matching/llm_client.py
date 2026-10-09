@@ -45,7 +45,7 @@ def complete(system: str, user: str) -> str:
                 raw = response.read()
             return _message_text(json.loads(raw.decode('utf-8')))
         except HTTPError as exc:
-            last_error = _wrap_http_error(exc, url)
+            last_error = _wrap_http_error(exc, url, api_key)
         except (URLError, TimeoutError, OSError, UnicodeDecodeError, ValueError) as exc:
             last_error = exc
     if last_error is not None:
@@ -82,7 +82,7 @@ def embed(texts: list[str]) -> list[list[float]]:
                 json.loads(raw.decode('utf-8')), len(texts)
             )
         except HTTPError as exc:
-            last_error = _wrap_http_error(exc, url)
+            last_error = _wrap_http_error(exc, url, api_key)
         except (URLError, TimeoutError, OSError, UnicodeDecodeError, ValueError) as exc:
             last_error = exc
     if last_error is not None:
@@ -148,14 +148,22 @@ def _embeddings_list(payload: object, expected: int) -> list[list[float]]:
         ) from exc
 
 
-def _wrap_http_error(exc: HTTPError, url: str) -> ValueError:
-    """Читает тело HTTP-ошибки и возвращает ValueError с человекочитаемым текстом."""
+def _redact(text: str, secret: str) -> str:
+    # Пустой секрет нельзя отдавать в str.replace: он вставится между всеми символами.
+    if not secret or not text:
+        return text
+    return text.replace(secret, '***')
+
+
+def _wrap_http_error(exc: HTTPError, url: str, secret: str) -> ValueError:
+    """Читает тело HTTP-ошибки и возвращает ValueError. Ключ API в текст не попадает."""
     try:
         raw = exc.read()
         exc.close()
         text = raw.decode('utf-8', errors='replace').strip()
     except Exception:
         text = ''
+    text = _redact(text, secret)
     detail = ''
     if text:
         try:
@@ -177,7 +185,7 @@ def _wrap_http_error(exc: HTTPError, url: str) -> ValueError:
             snippet = text[:200]
             detail = snippet + ('…' if len(text) > 200 else '')
     status = getattr(exc, 'code', exc.status) or '?'
-    msg = f'HTTP {status} {url}'
+    msg = f'HTTP {status} {_redact(url, secret)}'
     if detail:
         msg = f'{msg}: {detail}'
-    return ValueError(msg)
+    return ValueError(_redact(msg, secret))

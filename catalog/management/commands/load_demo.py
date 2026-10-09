@@ -8,14 +8,23 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from catalog.models import Institution, Site
+from catalog.models import (
+    SEASON_AUTUMN,
+    SEASON_CHOICES,
+    SEASON_SPRING,
+    SEASON_SUMMER,
+    SEASON_WINTER,
+    SEASON_YEAR_ROUND,
+    Institution,
+    Site,
+)
 
 # Встроенные строки показывают колонки и связь «учреждение — несколько площадок».
 DEMO_CSV = """\
-institution_name,description,treatment_profile,address,latitude,longitude,transport_accessibility,min_daily_price,max_daily_price,procedures,excursions
-Демо-санаторий «Ключи»,Пример описания учреждения для схемы CSV.,Заболевания опорно-двигательного аппарата,"ул. Примерная, 1",55.750000,37.620000,4,4500.00,9200.00,"Пример текста процедур: ванны, массаж.",Пример текста экскурсий: обзорная прогулка.
-Демо-санаторий «Озеро»,Пример второго учреждения с двумя площадками.,Сердечно-сосудистые заболевания,"наб. Учебная, 2",43.580000,39.720000,3,5100.00,11000.00,Пример текста процедур: ингаляции.,Пример текста экскурсий: поездка к смотровой площадке.
-Демо-санаторий «Озеро»,Пример второго учреждения с двумя площадками.,Сердечно-сосудистые заболевания,"пер. Схемы, 3",43.590000,39.730000,2,3900.00,7600.00,Пример текста процедур: лечебная физкультура.,Пример текста экскурсий: пеший маршрут по парку.
+institution_name,description,treatment_profile,address,latitude,longitude,transport_accessibility,min_daily_price,max_daily_price,procedures,excursions,season,limited_mobility_access,rating
+Демо-санаторий «Ключи»,Пример описания учреждения для схемы CSV.,Заболевания опорно-двигательного аппарата,"ул. Примерная, 1",55.750000,37.620000,4,4500.00,9200.00,"Пример текста процедур: ванны, массаж.",Пример текста экскурсий: обзорная прогулка.,круглый год,1,4
+Демо-санаторий «Озеро»,Пример второго учреждения с двумя площадками.,Сердечно-сосудистые заболевания,"наб. Учебная, 2",43.580000,39.720000,3,5100.00,11000.00,Пример текста процедур: ингаляции.,Пример текста экскурсий: поездка к смотровой площадке.,лето,0,3
+Демо-санаторий «Озеро»,Пример второго учреждения с двумя площадками.,Сердечно-сосудистые заболевания,"пер. Схемы, 3",43.590000,39.730000,2,3900.00,7600.00,Пример текста процедур: лечебная физкультура.,Пример текста экскурсий: пеший маршрут по парку.,зима,1,5
 """
 
 REQUIRED_COLUMNS = (
@@ -33,6 +42,34 @@ REQUIRED_COLUMNS = (
 )
 
 
+def _fold(value):
+    return value.strip().casefold().replace('ё', 'е')
+
+
+def _season_aliases():
+    aliases = {}
+    for code, label in SEASON_CHOICES:
+        aliases[code] = code
+        aliases[_fold(label)] = code
+    aliases.update(
+        {
+            'круглогодично': SEASON_YEAR_ROUND,
+            'круглогодичный': SEASON_YEAR_ROUND,
+            'летний': SEASON_SUMMER,
+            'зимний': SEASON_WINTER,
+            'весенний': SEASON_SPRING,
+            'осенний': SEASON_AUTUMN,
+            'fall': SEASON_AUTUMN,
+        }
+    )
+    return aliases
+
+
+_SEASON_ALIASES = _season_aliases()
+_TRUE_VALUES = {'1', 'true', 'yes', 'y', 'да'}
+_FALSE_VALUES = {'0', 'false', 'no', 'n', 'нет'}
+
+
 class Command(BaseCommand):
     """Загружает учреждения (Institution) и связанные площадки (Site) из CSV.
 
@@ -40,7 +77,8 @@ class Command(BaseCommand):
     institution_name: одинаковое название собирает площадки в один Institution.
     Если название или пара «учреждение + адрес» уже есть в базе, команда
     обновляет эту запись. Повтор строки в том же файле оставляет последние
-    значения. Вся загрузка выполняется в одной транзакции.
+    значения. Вся загрузка выполняется в одной транзакции: ошибка в любой
+    строке отменяет уже прочитанные строки этого запуска.
 
     Кодировка UTF-8. Разделитель полей — запятая. Десятичный разделитель —
     точка. Первая строка — заголовок, лишние колонки игнорируются.
@@ -57,6 +95,15 @@ class Command(BaseCommand):
     max_daily_price — максимальная цена за сутки, не меньше минимальной.
     procedures — текст процедур.
     excursions — текст экскурсий.
+    season — необязательный сезон: круглый год, весна, лето, осень или зима.
+    Пустая ячейка — круглый год. Если колонки нет, при создании берётся
+    круглый год, а при обновлении сезон не меняется.
+    limited_mobility_access — необязательная доступность для маломобильных:
+    да или нет, 1 или 0. Пустая ячейка — нет. Если колонки нет, при создании
+    берётся нет, а при обновлении значение не меняется.
+    rating — необязательный рейтинг, целое число от 0 до 5. 0 значит, что
+    рейтинг не указан. Пустая ячейка — 0. Если колонки нет, при создании
+    берётся 0, а при обновлении рейтинг не меняется.
 
     Без аргумента читаются встроенные демо-строки (python manage.py load_demo).
     Свой файл передаётся путём (python manage.py load_demo путь/к/файлу.csv).
@@ -136,6 +183,14 @@ class Command(BaseCommand):
                 'procedures': self._text(row, 'procedures', line_number),
                 'excursions': self._text(row, 'excursions', line_number),
             }
+            if 'season' in row:
+                values['season'] = self._season(row, line_number)
+            if 'limited_mobility_access' in row:
+                values['limited_mobility_access'] = self._bool(
+                    row, 'limited_mobility_access', line_number
+                )
+            if 'rating' in row:
+                values['rating'] = self._optional_integer(row, 'rating', line_number)
 
             if name in seen_institutions:
                 institution = seen_institutions[name]
@@ -175,6 +230,51 @@ class Command(BaseCommand):
             self._save(site, line_number)
 
         return institutions_created, institutions_updated, sites_created, sites_updated
+
+    def _cell(self, row, column):
+        value = row.get(column)
+        if value is None:
+            return ''
+        return str(value).strip()
+
+    def _default(self, field_name):
+        return Site._meta.get_field(field_name).get_default()
+
+    def _season(self, row, line_number):
+        raw = self._cell(row, 'season')
+        if raw == '':
+            return self._default('season')
+        code = _SEASON_ALIASES.get(_fold(raw))
+        if code is None:
+            labels = ', '.join(label for _code, label in SEASON_CHOICES)
+            raise CommandError(
+                f'Строка {line_number}: поле season должно быть одним из: {labels}.'
+            )
+        return code
+
+    def _bool(self, row, column, line_number):
+        raw = self._cell(row, column)
+        if raw == '':
+            return self._default(column)
+        folded = _fold(raw)
+        if folded in _TRUE_VALUES:
+            return True
+        if folded in _FALSE_VALUES:
+            return False
+        raise CommandError(
+            f'Строка {line_number}: поле {column} должно быть да или нет ({raw}).'
+        )
+
+    def _optional_integer(self, row, column, line_number):
+        raw = self._cell(row, column)
+        if raw == '':
+            return self._default(column)
+        try:
+            return int(raw)
+        except ValueError as exc:
+            raise CommandError(
+                f'Строка {line_number}: поле {column} не является целым числом ({raw}).'
+            ) from exc
 
     def _text(self, row, column, line_number):
         value = row.get(column)

@@ -7,9 +7,40 @@ from django.db import models
 
 TRANSPORT_ACCESSIBILITY_CHOICES = [(score, str(score)) for score in range(1, 6)]
 
+SEASON_YEAR_ROUND = 'year_round'
+SEASON_SPRING = 'spring'
+SEASON_SUMMER = 'summer'
+SEASON_AUTUMN = 'autumn'
+SEASON_WINTER = 'winter'
+SEASON_CODES = (
+    SEASON_YEAR_ROUND,
+    SEASON_SPRING,
+    SEASON_SUMMER,
+    SEASON_AUTUMN,
+    SEASON_WINTER,
+)
+SEASON_CHOICES = [
+    (SEASON_YEAR_ROUND, 'круглый год'),
+    (SEASON_SPRING, 'весна'),
+    (SEASON_SUMMER, 'лето'),
+    (SEASON_AUTUMN, 'осень'),
+    (SEASON_WINTER, 'зима'),
+]
+
+RATING_MIN = 0
+RATING_MAX = 5
+RATING_CHOICES = [(RATING_MIN, 'не указан')] + [
+    (score, str(score)) for score in range(RATING_MIN + 1, RATING_MAX + 1)
+]
+
 
 class Institution(models.Model):
-    name = models.CharField('название', max_length=255)
+    name = models.CharField(
+        'название',
+        max_length=255,
+        unique=True,
+        error_messages={'unique': 'Учреждение с таким названием уже есть.'},
+    )
     description = models.TextField('описание')
     treatment_profile = models.CharField('профиль лечения', max_length=255)
 
@@ -62,12 +93,25 @@ class Site(models.Model):
     )
     procedures = models.TextField('текст процедур')
     excursions = models.TextField('текст экскурсий')
-    # season = models.TextField('сезон')
-    # limited_mobility_people = models.PositiveSmallIntegerField()
-    # rating = models.PositiveSmallIntegerField()
-    # # TODO(team): сезон
-    # # TODO(team): доступность для маломобильных
-    # # TODO(team): рейтинг
+    season = models.CharField(
+        'сезон',
+        max_length=32,
+        choices=SEASON_CHOICES,
+        default=SEASON_YEAR_ROUND,
+        help_text='Когда площадка принимает гостей.',
+    )
+    limited_mobility_access = models.BooleanField(
+        'доступность для маломобильных',
+        default=False,
+        help_text='Есть условия для людей с ограниченной подвижностью.',
+    )
+    rating = models.PositiveSmallIntegerField(
+        'рейтинг',
+        choices=RATING_CHOICES,
+        default=RATING_MIN,
+        validators=[MinValueValidator(RATING_MIN), MaxValueValidator(RATING_MAX)],
+        help_text='Оценка от 0 до 5. 0 — рейтинг не указан.',
+    )
 
     class Meta:
         verbose_name = 'площадка'
@@ -90,6 +134,22 @@ class Site(models.Model):
             models.CheckConstraint(
                 condition=models.Q(longitude__gte=-180) & models.Q(longitude__lte=180),
                 name='site_longitude_range',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(rating__gte=RATING_MIN)
+                & models.Q(rating__lte=RATING_MAX),
+                name='site_rating_between_0_and_5',
+                violation_error_message='Рейтинг должен быть от 0 до 5.',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(season__in=SEASON_CODES),
+                name='site_season_known',
+                violation_error_message='Сезон должен быть одним из известных значений.',
+            ),
+            models.UniqueConstraint(
+                fields=['institution', 'address'],
+                name='site_institution_address_uniq',
+                violation_error_message='У этого учреждения уже есть площадка с таким адресом.',
             ),
         ]
 
