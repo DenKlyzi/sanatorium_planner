@@ -1,46 +1,50 @@
 {% extends "base.html" %}
+{% load planner_ui %}
 
 {% block title %}Мои планы{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<header class="page-head">
   <h1>Мои планы</h1>
-  <p class="page-subtitle">Сохранённые маршруты</p>
-</div>
+  <span class="sand-rule" aria-hidden="true"></span>
+  <p class="lede">Сохранённые маршруты.</p>
+</header>
 
 {% if plans %}
-  <div class="plans-list">
+  <ul class="plan-list">
     {% for plan in plans %}
-      <article class="plan-item">
-        <div class="plan-item__main">
-          <h2 class="plan-item__title">
-            <a href="{% url 'plan_detail' plan.pk %}">План #{{ plan.pk }}</a>
-          </h2>
-          <p class="plan-item__meta">
-            Площадок: <b>{{ plan.sites.count }}</b>
-          </p>
-          {% if plan.route_text %}
-            <p class="plan-item__query">
-              {{ plan.route_text|truncatechars:140 }}
-            </p>
-          {% endif %}
-        </div>
-        <div class="plan-item__actions">
-          <a href="{% url 'plan_detail' plan.pk %}" class="btn btn-outline btn-sm">Открыть</a>
-          <form method="post" action="{% url 'plan_delete' plan.pk %}" class="inline-form">
-  {% csrf_token %}
-  <button type="submit" class="btn btn-ghost btn-sm">Удалить</button>
-</form>
-        </div>
-      </article>
+      <li>
+        <article class="plan-item">
+          <div class="plan-item__main">
+            <h2 class="plan-item__title">
+              <a href="{% url 'plan_detail' plan.pk %}">План {{ plan.pk }}</a>
+            </h2>
+            <p class="plan-item__meta">Площадок: {{ plan.sites.all|length }}</p>
+            {% if plan.route_text %}
+              <p class="plan-item__query">{{ plan.route_text|clean_copy|truncatechars:140 }}</p>
+            {% endif %}
+            <ul class="plan-item__sites">
+              {% for site in plan.sites.all %}
+                <li>{{ site.institution.name }} — {{ site.address }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          <div class="plan-item__actions">
+            <a class="btn" href="{% url 'plan_detail' plan.pk %}">Открыть</a>
+            <form method="post" action="{% url 'plan_delete' plan.pk %}" class="inline-form" onsubmit="return confirm('Удалить этот план?');">
+              {% csrf_token %}
+              <button type="submit" class="btn">Удалить</button>
+            </form>
+          </div>
+        </article>
+      </li>
     {% endfor %}
-  </div>
+  </ul>
 {% else %}
-  <div class="empty-state">
-    <div class="empty-state__icon">🗺️</div>
+  <div class="empty">
     <h2>Планов пока нет</h2>
-    <p>Найдите площадки и соберите первый план.</p>
-    <a href="{% url 'search' %}" class="btn btn-primary">Начать подбор</a>
+    <p>Подберите площадки и соберите первый маршрут.</p>
+    <a class="btn btn-primary" href="{% url 'search' %}">Начать подбор</a>
   </div>
 {% endif %}
 {% endblock %}

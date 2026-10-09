@@ -1,17 +1,150 @@
 {% extends "base.html" %}
+{% load planner_ui %}
 
-{% block title %}План{% endblock %}
+{% block title %}План {{ plan.pk }}{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-3">План</h1>
-<p>Пользователь: {{ plan.user.get_username }}</p>
-<h2 class="h5">Площадки</h2>
-<ul>
-  {% for site in sites %}
-  <li>{{ site.institution.name }}</li>
+<header class="page-head">
+  <h1>План {{ plan.pk }}</h1>
+  <span class="sand-rule" aria-hidden="true"></span>
+  <p class="lede">Сохранён для {{ plan.user.get_username }}</p>
+  <div class="page-actions">
+    <a class="btn" href="{% url 'plan_list' %}">Все планы</a>
+    <a class="btn" href="{% url 'search' %}">Новый запрос</a>
+    <form method="post" action="{% url 'plan_delete' plan.pk %}" class="inline-form" onsubmit="return confirm('Удалить этот план?');">
+      {% csrf_token %}
+      <button type="submit" class="btn">Удалить</button>
+    </form>
+  </div>
+</header>
+
+<section class="route" aria-labelledby="route-title">
+  <h2 id="route-title">Маршрут</h2>
+  {% for stop in route.stops %}
+    <article class="route-card">
+      <div class="route-card__stripe" aria-hidden="true"></div>
+      <div class="route-card__body">
+        <h3 class="route-card__name">{{ stop.name }}</h3>
+        <ul class="route-card__meta">
+          <li>{{ stop.day }}</li>
+          {% if stop.price %}
+            <li class="price">{{ stop.price }}</li>
+          {% endif %}
+          <li>Транспорт {{ stop.transport }} из 5</li>
+        </ul>
+        {% if stop.arrival %}
+          <section class="route-block">
+            <h4>Как добраться</h4>
+            <p>{{ stop.arrival }}</p>
+          </section>
+        {% endif %}
+        {% if stop.procedures %}
+          <section class="route-block">
+            <h4>Процедуры</h4>
+            <ul class="tags">
+              {% for phrase in stop.procedures %}
+                <li>{{ phrase }}</li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+        {% if stop.excursions %}
+          <section class="route-block">
+            <h4>Экскурсии</h4>
+            <ul class="tags">
+              {% for phrase in stop.excursions %}
+                <li>{{ phrase }}</li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+        {% if forloop.last and route.summary %}
+          <section class="route-block">
+            <h4>Итог</h4>
+            <p>{{ route.summary }}</p>
+          </section>
+        {% endif %}
+        {% if forloop.last and route.tips %}
+          <section class="route-block">
+            <h4>Советы</h4>
+            <ul class="route-tips">
+              {% for tip in route.tips %}
+                <li>{{ tip }}</li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+      </div>
+    </article>
   {% endfor %}
-</ul>
-<h2 class="h5">Маршрут</h2>
-<div>{{ plan.route_text|linebreaksbr }}</div>
-<p class="mt-4"><a href="{% url 'search' %}">Новый запрос</a></p>
+  {% if not route.stops and route.summary or not route.stops and route.tips %}
+    <article class="route-card">
+      <div class="route-card__stripe" aria-hidden="true"></div>
+      <div class="route-card__body">
+        {% if route.summary %}
+          <section class="route-block">
+            <h4>Итог</h4>
+            <p>{{ route.summary }}</p>
+          </section>
+        {% endif %}
+        {% if route.tips %}
+          <section class="route-block">
+            <h4>Советы</h4>
+            <ul class="route-tips">
+              {% for tip in route.tips %}
+                <li>{{ tip }}</li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+      </div>
+    </article>
+  {% endif %}
+  {% if route.extra %}
+    <article class="route-card">
+      <div class="route-card__stripe" aria-hidden="true"></div>
+      <div class="route-card__body">
+        <div class="route-extra">{{ route.extra|linebreaksbr }}</div>
+      </div>
+    </article>
+  {% endif %}
+</section>
+
+<section class="plan-sites">
+  <h2 class="plan-sites__title">Площадки</h2>
+  {% if sites %}
+    <div class="institution-list">
+      {% for group in sites|group_by_institution %}
+        <article class="institution">
+          <div class="institution__cap" aria-hidden="true"></div>
+          <div class="institution__body">
+            <header class="institution__head">
+              <div>
+                <h3 class="institution__name">{{ group.institution.name }}</h3>
+                {% if group.institution.treatment_profile %}
+                  <p class="institution__profile">{{ group.institution.treatment_profile }}</p>
+                {% endif %}
+              </div>
+              <p class="institution__count">Площадок: {{ group.items|length }}</p>
+            </header>
+            <div class="venue-grid">
+              {% for site in group.items %}
+                <article class="site-card">
+                  <p class="site-card__title">{{ site.address }}</p>
+                  {% include "planner/_venue_facts.html" with site=site %}
+                </article>
+              {% endfor %}
+            </div>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <h2>В плане нет площадок</h2>
+      <p>Соберите маршрут заново и отметьте хотя бы одну площадку.</p>
+      <a class="btn btn-primary" href="{% url 'search' %}">К подбору</a>
+    </div>
+  {% endif %}
+</section>
 {% endblock %}

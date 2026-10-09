@@ -3,27 +3,22 @@
 {% block title %}Регистрация{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4">Регистрация</h1>
-<form method="post" action="{% url 'register' %}">
-  {% csrf_token %}
-  {% if form.non_field_errors %}
-  <div class="alert alert-danger">{{ form.non_field_errors }}</div>
-  {% endif %}
-  {% for field in form %}
-  <div class="mb-3">
-    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-    {{ field }}
-    {% if field.help_text %}
-    <div class="form-text">{{ field.help_text|safe }}</div>
+<header class="page-head">
+  <h1>Регистрация</h1>
+  <span class="sand-rule" aria-hidden="true"></span>
+  <p class="lede">Имя и пароль нужны, чтобы сохранять свои маршруты.</p>
+</header>
+<div class="sheet sheet--narrow">
+  <form method="post" action="{% url 'register' %}">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="alert" role="alert">{{ form.non_field_errors }}</div>
     {% endif %}
-    {% for error in field.errors %}
-    <div class="form-text text-danger">{{ error }}</div>
-    {% endfor %}
-  </div>
-  {% endfor %}
-  <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
-</form>
-<p class="mt-3 text-center">
-  Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a>
-</p>
+    {% include "planner/_form_fields.html" with stack=True %}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
+    </div>
+  </form>
+  <p class="auth-switch">Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a></p>
+</div>
 {% endblock %}

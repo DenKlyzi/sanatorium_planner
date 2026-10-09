@@ -4,39 +4,46 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
   <title>{% block title %}Санатории{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="{% static 'style.css' %}" rel="stylesheet">
 </head>
 <body>
-  <header class="navbar">
-    <div class="navbar__inner">
-      <a href="{% url 'search' %}" class="navbar__brand">
-        <span class="navbar__logo">🏖️</span>
-        <span class="navbar__title">Санатории</span>
+  <a class="skip-link" href="#content">К содержанию</a>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="{% url 'search' %}">
+        <img class="brand__mark" src="{% static 'logo.png' %}" alt="" width="73" height="48">
+        <span class="brand__text">
+          <span class="brand__name">Санатории</span>
+        </span>
       </a>
-
       {% if user.is_authenticated %}
-        <nav class="navbar__links">
-          <a href="{% url 'plan_list' %}" class="navbar__link">Мои планы</a>
+        <nav class="site-nav" aria-label="Разделы">
+          <a class="site-nav__link{% if request.resolver_match.url_name == 'plan_list' or request.resolver_match.url_name == 'plan_detail' %} is-active{% endif %}"
+             href="{% url 'plan_list' %}"
+             {% if request.resolver_match.url_name == 'plan_list' or request.resolver_match.url_name == 'plan_detail' %}aria-current="page"{% endif %}>Мои планы</a>
         </nav>
-        <div class="navbar__user">
-          <span class="navbar__username">
-            <span class="navbar__user-icon">👤</span>{{ user.username }}
-          </span>
-          <form method="post" action="{% url 'logout' %}" class="navbar__logout">
+        <div class="site-user">
+          <span class="site-user__name" title="{{ user.username }}">{{ user.username }}</span>
+          <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}
-            <button type="submit" class="btn btn-outline btn-sm">Выйти</button>
+            <button type="submit" class="btn">Выйти</button>
           </form>
         </div>
       {% endif %}
     </div>
   </header>
-
-  <main class="container py-4">
+  <main id="content" class="page">
     {% if messages %}
-      {% for message in messages %}
-        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-      {% endfor %}
+      <ul class="messages">
+        {% for message in messages %}
+          <li class="alert" role="status">{{ message }}</li>
+        {% endfor %}
+      </ul>
     {% endif %}
     {% block content %}{% endblock %}
   </main>

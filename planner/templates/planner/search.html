@@ -3,9 +3,15 @@
 {% block title %}Подбор санатория{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4">Подбор санатория</h1>
+<header class="page-head">
+  <h1>Подбор санатория</h1>
+  <span class="sand-rule" aria-hidden="true"></span>
+  <p class="lede">Укажите бюджет за сутки и пожелания. Подбор покажет площадки, которые им подходят.</p>
+</header>
 {% if match_error %}
-<div class="alert alert-danger">{{ match_error }}</div>
+  <div class="alert" role="alert">{{ match_error }}</div>
 {% endif %}
-{% include "planner/_search_form.html" %}
+<div class="sheet">
+  {% include "planner/_search_form.html" %}
+</div>
 {% endblock %}

@@ -69,6 +69,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'sanatorium_planner.context_processors.yandex_maps',
             ],
         },
     },
@@ -142,3 +143,8 @@ LLM_MODEL = os.environ.get('LLM_MODEL', '')
 # Имя модели эмбеддингов на прокси (например text-embedding-3-small
 # или embed-multilingual-v3.0). Значение только из окружения.
 EMBEDDING_MODEL_NAME = os.environ.get('EMBEDDING_MODEL_NAME', '')
+
+# Ключ JavaScript API Яндекс.Карт. В шаблон уходит только отсюда.
+YANDEX_MAPS_API_KEY = os.environ.get('YANDEX_MAPS_API_KEY') or os.environ.get(
+    'YANDEX_API_KEY', ''
+)

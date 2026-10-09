@@ -406,9 +406,11 @@ class LoadDemoTests(TestCase):
         self.assertIn('Учреждения: создано 0, обновлено 20.', output.getvalue())
         self.assertIn('Площадки: создано 0, обновлено 25.', output.getvalue())
         borok = Site.objects.get(
-            address='посёлок Борок, Жуковский район, Калужская область'
+            address='Кремёнки, улица Мира, 17, Жуковский район, Калужская область'
         )
-        cottage = Site.objects.get(address__contains='домик в лесу')
+        cottage = Site.objects.get(
+            address='село Дворцы, Набережная улица, 22Б, Дзержинский район, Калужская область'
+        )
         meadow = Site.objects.get(institution__name='Пансионат «Грибная поляна»')
         budget = Site.objects.get(institution__name='Пансионат «Белые ночи»')
         rehab = Site.objects.get(institution__name='Пансионат «Луговой»')

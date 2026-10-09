@@ -1,0 +1,26 @@
+{% load planner_ui %}
+<p class="fact">Цена за сутки: <span class="price">{{ site|price_range }}</span></p>
+<p class="fact">Транспортная доступность: {{ site.transport_accessibility }} из 5</p>
+<p class="fact">Сезон: {{ site.get_season_display }}</p>
+<p class="fact">{% if site.limited_mobility_access %}Доступно для маломобильных{% else %}Нет условий для маломобильных{% endif %}</p>
+<p class="fact">{% if site.rating %}Рейтинг: {{ site.rating }} из 5{% else %}Рейтинг не указан{% endif %}</p>
+{% if site.procedures %}
+  <div class="phrases">
+    <p class="phrases__label">Процедуры</p>
+    <ul class="tags">
+      {% for phrase in site.procedures|split_phrases %}
+        <li>{{ phrase }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+{% if site.excursions %}
+  <div class="phrases">
+    <p class="phrases__label">Экскурсии</p>
+    <ul class="tags">
+      {% for phrase in site.excursions|split_phrases %}
+        <li>{{ phrase }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}

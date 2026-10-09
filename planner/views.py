@@ -15,14 +15,25 @@ from matching.engine import Preferences, explain, match
 
 from .forms import PlanBuildForm, SearchForm
 from .models import Plan
+from .presentation import clean_copy, format_price_range, present_route, split_phrases
 
 
 PLAN_SYSTEM_PROMPT = (
     'Ты тур-агент, составляющий маршрут по санаториям и площадкам Калужской области. '
-    'Напиши пошаговый текст маршрута на русском языке с учётом бюджета и пожеланий пользователя. '
-    'Для каждой площадки укажи: примерный день визита, как туда добраться, '
-    'стоимость и ключевые процедуры и экскурсии. В конце дай общий бюджетный итог и советы. '
-    'Структурированный текст с заголовками, 150–400 слов. Без эмодзи.'
+    'Пиши только по-русски, без слов и букв других языков, без эмодзи и без разметки. '
+    'Цены пиши в виде «2 900–7 400 ₽»: пробел между тысячами, короткое тире, без копеек. '
+    'Не выдумывай цены, сроки и услуги: бери их только из переданных данных. '
+    'Для каждой площадки, в заданном порядке, выведи блоки:\n'
+    'ПЛОЩАДКА: название\n'
+    'ДЕНЬ: номер дня\n'
+    'КАК ДОБРАТЬСЯ: одно или два коротких предложения\n'
+    'ПРОЦЕДУРЫ: услуги через запятую, одна услуга — один пункт\n'
+    'ЭКСКУРСИИ: пункты через запятую; запятую внутри скобок не выноси в отдельный пункт\n'
+    'После всех площадок выведи:\n'
+    'ИТОГ: одно или два предложения об общем бюджете\n'
+    'СОВЕТЫ:\n'
+    '- короткий совет\n'
+    '- короткий совет'
 )
 
 _MATCH_ERRORS = (OSError, ValueError, RuntimeError, ImportError)
@@ -93,10 +104,10 @@ def build_plan(request: HttpRequest) -> HttpResponse:
 
     sites = _ordered_sites(form.cleaned_data['sites'], request.POST.getlist('sites'))
     try:
-        route_text = llm_client.complete(
+        route_text = clean_copy(llm_client.complete(
             PLAN_SYSTEM_PROMPT,
             _route_user_text(form.cleaned_data, sites),
-        ).strip()
+        ).strip()).strip()
     except _LLM_ERRORS as exc:
         detail = str(exc).strip() if str(exc).strip() else 'неизвестная ошибка'
         return render(
@@ -139,10 +150,12 @@ def plan_list(request: HttpRequest) -> HttpResponse:
 def plan_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Чужой план по прямой ссылке недоступен."""
     plan = get_object_or_404(Plan, pk=pk, user=request.user)
-    sites = plan.sites.select_related('institution').all()
+    sites = _plan_sites(plan)
+    route = present_route(plan.route_text, sites)
     return render(request, 'planner/plan.html', {
         'plan': plan,
         'sites': sites,
+        'route': route,
     })
 
 
@@ -188,6 +201,19 @@ def _plan_form(cleaned) -> PlanBuildForm:
     )
 
 
+def _plan_sites(plan: Plan) -> list[Site]:
+    """Площадки в том порядке, в каком их добавили в план."""
+    through = Plan.sites.through
+    site_ids = list(
+        through.objects.filter(plan=plan).order_by('id').values_list('site_id', flat=True)
+    )
+    by_id = {
+        site.pk: site
+        for site in Site.objects.select_related('institution').filter(pk__in=site_ids)
+    }
+    return [by_id[pk] for pk in site_ids if pk in by_id]
+
+
 def _ordered_sites(chosen, posted_ids) -> list[Site]:
     by_id = {site.pk: site for site in chosen}
     ordered = []
@@ -228,24 +254,24 @@ def _route_user_text(cleaned, sites: list[Site]) -> str:
         lines.append(f'{i}. {site.institution.name}')
         if getattr(site, 'address', None):
             lines.append(f'   Адрес: {site.address}')
-        if site.min_daily_price is not None and site.max_daily_price is not None:
-            lines.append(f'   Цена за сутки: {site.min_daily_price}–{site.max_daily_price} ₽')
-        elif site.min_daily_price is not None:
-            lines.append(f'   Цена за сутки: от {site.min_daily_price} ₽')
+        price = format_price_range(site.min_daily_price, site.max_daily_price)
+        if price:
+            lines.append(f'   Цена за сутки: {price}')
         if getattr(site, 'transport_accessibility', None) is not None:
             lines.append(f'   Транспортная доступность: {site.transport_accessibility} из 5')
-        if getattr(site, 'procedures', None):
-            lines.append(f'   Процедуры: {site.procedures}')
-        if getattr(site, 'excursions', None):
-            lines.append(f'   Экскурсии: {site.excursions}')
+        procedures = ', '.join(split_phrases(getattr(site, 'procedures', '')))
+        if procedures:
+            lines.append(f'   Процедуры: {procedures}')
+        excursions = ', '.join(split_phrases(getattr(site, 'excursions', '')))
+        if excursions:
+            lines.append(f'   Экскурсии: {excursions}')
 
     lines.append('')
     lines.append('Требования к тексту:')
-    lines.append('- Язык: русский. Без эмодзи.')
-    lines.append('- Без ** и ## пиши.')
+    lines.append('- Только русский язык. Без эмодзи, без ** и без ##.')
+    lines.append('- Без слов на других языках и без обрывков вроде provided.')
     lines.append('- Порядок площадок — строго как в списке выше.')
-    lines.append('- Цены и сроки бери только из переданных данных, не придумывай.')
-    lines.append('- Для каждой площадки: день визита, как добраться, стоимость, ключевые процедуры и экскурсии.')
-    lines.append('- В конце — общий бюджетный итог и 2–3 совета.')
+    lines.append('- Цены пиши как «2 900–7 400 ₽», без копеек. Не придумывай цены и услуги.')
+    lines.append('- Формат блоков — как в системной инструкции.')
 
     return '\n'.join(lines)

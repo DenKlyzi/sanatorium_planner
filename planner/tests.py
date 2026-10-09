@@ -140,7 +140,7 @@ class SearchViewTests(TestCase):
         self.assertEqual(preferences.query, 'море\nПроцедуры: ванны\nЭкскурсии: дворец')
         explain.assert_called_once_with(preferences, site)
         self.assertContains(response, 'Ключи')
-        self.assertContains(response, 'Цена за сутки: 4500,00–9200,00')
+        self.assertContains(response, 'Цена за сутки: <span class="price">4 500–9 200 ₽</span>')
         self.assertContains(response, 'Транспортная доступность: 4 из 5')
         body = response.content.decode()
         self.assertEqual(body.count('id="id_budget"'), 1)
@@ -275,7 +275,7 @@ class BuildPlanViewTests(TestCase):
         later = self.make_site('Маяк', 'Крым, Алушта')
         earlier = self.make_site('Ключи', 'Крым, Ялта')
 
-        response = self.client.post(reverse('build_plan'), self.plan_data(later, earlier))
+        response = self.client.post(reverse('build_plan'), self.plan_data(later, earlier), follow=True)
 
         plan = Plan.objects.get()
         self.assertEqual(response.status_code, 200)
@@ -301,7 +301,7 @@ class BuildPlanViewTests(TestCase):
     def test_route_text_is_escaped(self, complete):
         site = self.make_site('Ключи', 'Крым, Ялта')
 
-        response = self.client.post(reverse('build_plan'), self.plan_data(site))
+        response = self.client.post(reverse('build_plan'), self.plan_data(site), follow=True)
 
         self.assertContains(response, '&lt;i&gt;маршрут&lt;/i&gt;')
         self.assertNotContains(response, '<i>маршрут</i>')

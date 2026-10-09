@@ -1,27 +1,37 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Вход{% endblock %}
 
 {% block content %}
-<h1 class="hello">Добро пожаловать в "Подбор санатория"</h1>
-<h1 class="h3 mb-4">Вход</h1>
-<form method="post" action="{% url 'login' %}">
-  {% csrf_token %}
-  {% if form.non_field_errors %}
-  <div class="alert alert-danger">{{ form.non_field_errors }}</div>
-  {% endif %}
-  {% for field in form %}
-  <div class="mb-3">
-    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-    {{ field }}
-    {% for error in field.errors %}
-    <div class="form-text text-danger">{{ error }}</div>
-    {% endfor %}
+<div class="login-split">
+  <header class="page-head">
+    <h1>Вход</h1>
+    <span class="sand-rule" aria-hidden="true"></span>
+    <p class="lede">Войдите, чтобы подобрать санаторий и сохранить маршрут.</p>
+  </header>
+  <div class="sheet sheet--narrow">
+    <form method="post" action="{% url 'login' %}">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="alert" role="alert">{{ form.non_field_errors }}</div>
+      {% endif %}
+      {% include "planner/_form_fields.html" with stack=True %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Войти</button>
+      </div>
+    </form>
+    <p class="auth-switch">Нет аккаунта? <a href="{% url 'register' %}">Регистрация</a></p>
   </div>
-  {% endfor %}
-  <input type="hidden" name="next" value="{{ next }}">
-  <button type="submit" class="btn btn-primary">Войти</button>
-</form>
-<p class="mt-3 text-center">
-  Нет аккаунта? <a href="{% url 'register' %}">Регистрация</a>
-</p>
+  <aside class="login-note">
+    <div class="login-note__cap" aria-hidden="true"></div>
+    <div class="login-note__body">
+      <p class="login-note__place">Калужская область</p>
+      <p class="login-note__text">Площадки, процедуры и экскурсии собираются в один маршрут.</p>
+    </div>
+  </aside>
+  <div class="login-split__side">
+    <img src="{% static 'img/login-side.jpg' %}" alt="">
+  </div>
+</div>
 {% endblock %}
